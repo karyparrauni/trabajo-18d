@@ -1,0 +1,22 @@
+# Python & Pytest
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Artefactos y reportes temporales
+*.tar
+reports-json/
+*-results.json
+gitleaks-report.json
+
+# Entorno y claves
+.env
+*.key
+django-DefectDojo/
+values-local.yaml
+
+# Secretos locales de Kubernetes
+/guia-09/manifests/db/secret.yml
+
+# Artefactos renderizados con posibles credenciales
+/manifests-rendered-prod.yaml
