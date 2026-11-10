@@ -1,0 +1,30 @@
+name: Self-Hosted Runner Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  runner-test:
+    runs-on: arc-runner-set
+
+    steps:
+      - name: Información del runner
+        run: |
+          echo "=== RUNNER ==="
+          echo "Runner: $RUNNER_NAME"
+          echo "OS: $RUNNER_OS"
+          echo "Arch: $RUNNER_ARCH"
+          echo "Hostname: $(hostname)"
+          echo "Usuario: $(id -un)"
+          echo "UID: $(id -u)"
+          echo "GID: $(id -g)"
+
+      - name: Verificar entorno
+        run: |
+          echo "=== ENTORNO ==="
+          uname -a
+          cat /etc/os-release | head -5
+
+      - name: Finalizar prueba
+        run: |
+          echo "Self-Hosted Runner funcionando correctamente."
