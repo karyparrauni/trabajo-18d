@@ -147,7 +147,7 @@ jobs:
   # =========================================================================
   defectdojo-import:
     name: "Fase 3: Centralización en DefectDojo (Vulnerability Management)"
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set
     needs: [security-audits]
     if: always()
     steps:
@@ -182,7 +182,6 @@ jobs:
                 -w "%{http_code}" \
                 -X POST "$DEFECTDOJO_URL/api/v2/reimport-scan/" \
                 -H "Authorization: Token $DEFECTDOJO_TOKEN" \
-                -H "ngrok-skip-browser-warning: true" \
                 -F "product_name=$PRODUCT_NAME" \
                 -F "engagement_name=$ENGAGEMENT_NAME" \
                 -F "scan_type=$SCAN_TYPE" \
