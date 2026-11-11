@@ -73,25 +73,41 @@ Implementar un **GitHub Actions Self-Hosted Runner** dentro de un clúster Kuber
 
 ### Componentes
 
-- Kubernetes local con k3d/k3s
+- Kubernetes local basado en k3d/k3s
 - GitHub Actions
 - Actions Runner Controller (ARC)
 - GitHub Actions Runner Scale Set
-- cert-manager
 - GitHub Personal Access Token almacenado como Secret de Kubernetes
 - Runners efímeros
 
 ### Arquitectura
 
-GitHub Actions delega la ejecución de los jobs a runners administrados por ARC dentro del clúster Kubernetes.
+GitHub Actions delega la ejecución de los jobs seleccionados a runners administrados por ARC dentro del clúster Kubernetes.
+
+El flujo implementado utiliza un **Runner Scale Set** denominado `arc-runner-set`. Cuando GitHub Actions necesita ejecutar un job con:
+
+```yaml
+runs-on: arc-runner-set
+```
+
+ARC crea un runner efímero dentro del namespace `arc-runners`. Al finalizar el job, el runner es eliminado.
 
 La comunicación con GitHub se realiza mediante conexiones salientes HTTPS/443. No se requiere exponer puertos entrantes del runner hacia Internet.
+
+Para la comunicación con DefectDojo se utiliza directamente el DNS interno de Kubernetes:
+
+```text
+http://defectdojo-django.defectdojo.svc.cluster.local
+```
+
+No se utiliza ngrok para esta comunicación.
 
 ### Seguridad
 
 - Credenciales almacenadas mediante Kubernetes Secrets.
+- El GitHub Personal Access Token no se versiona en el repositorio.
 - Runners efímeros para reducir la persistencia del entorno de ejecución.
-- Ejecución con usuario no root.
+- Ejecución del runner con usuario no root.
 - Recursos CPU y memoria limitados.
 - Principio de menor privilegio.
 - No se versionan credenciales ni manifiestos renderizados que puedan contener secretos.
@@ -103,10 +119,154 @@ La comunicación con GitHub se realiza mediante conexiones salientes HTTPS/443. 
 | CPU | 200m | 2000m |
 | Memoria | 512Mi | 2Gi |
 
+### Configuración del Runner Scale Set
+
+El Runner Scale Set se desplegó mediante el chart OCI oficial de Actions Runner Controller:
+
+```text
+gha-runner-scale-set
+```
+
+Versión utilizada:
+
+```text
+0.15.1
+```
+
+Configuración:
+
+| Parámetro | Valor |
+|---|---|
+| Scale Set | `arc-runner-set` |
+| Namespace | `arc-runners` |
+| Versión ARC | `0.15.1` |
+| Runner mínimo | `0` |
+| Runner máximo | `1` |
+| URL de GitHub | `https://github.com/karyparrauni/trabajo-18d` |
+
+Con `minRunners: 0`, no se mantienen runners permanentemente activos. El runner se crea cuando GitHub Actions asigna un job al Scale Set.
+
 ### Entorno
 
-- Cluster: `k3d-notes-cluster`
-- Kubernetes: k3s
-- Namespace ARC controller: `arc-systems`
-- Namespace runners: `arc-runners`
-- Repositorio: `karyparrauni/trabajo-18d`
+| Recurso | Configuración |
+|---|---|
+| Repositorio | `karyparrauni/trabajo-18d` |
+| Rama | `main` |
+| Kubernetes | k3s `v1.31.5+k3s1` |
+| Namespace ARC Controller | `arc-systems` |
+| Namespace Runners | `arc-runners` |
+| Runner Scale Set | `arc-runner-set` |
+| ARC chart | `0.15.1` |
+| Helm | `v3.18.4` |
+| Runner mínimo | `0` |
+| Runner máximo | `1` |
+
+### Workflow de prueba del Self-Hosted Runner
+
+Se implementó el workflow:
+
+```text
+.github/workflows/self-hosted-runner-test.yml
+```
+
+El workflow utiliza:
+
+```yaml
+runs-on: arc-runner-set
+```
+
+y verifica:
+
+- Nombre del runner.
+- Sistema operativo.
+- Arquitectura.
+- Hostname.
+- Usuario y UID/GID.
+- Entorno Linux.
+- Acceso interno a DefectDojo.
+- Finalización correcta del job.
+
+La ejecución comprobó que el runner funciona correctamente dentro de Kubernetes y que se ejecuta con el usuario no root `runner`.
+
+Una vez finalizado el job, el pod efímero del runner es eliminado, confirmando el comportamiento esperado del Runner Scale Set.
+
+### Integración con DefectDojo
+
+La Fase 3 del pipeline de seguridad fue modificada para utilizar el Self-Hosted Runner:
+
+```yaml
+defectdojo-import:
+  runs-on: arc-runner-set
+```
+
+Esta fase recibe los reportes generados por las auditorías de seguridad y los importa mediante la API v2 de DefectDojo.
+
+Las credenciales se obtienen desde GitHub Actions Secrets:
+
+```text
+DEFECTDOJO_URL
+DEFECTDOJO_API_KEY
+```
+
+La URL utilizada dentro del clúster es:
+
+```text
+http://defectdojo-django.defectdojo.svc.cluster.local
+```
+
+Se verificó mediante un workflow independiente que el Self-Hosted Runner puede acceder correctamente al servicio DefectDojo utilizando el DNS interno de Kubernetes.
+
+### Pipeline de seguridad
+
+El workflow principal:
+
+```text
+.github/workflows/defectdojo-ci.yml
+```
+
+se organiza en cuatro fases:
+
+1. **Fase 1 — Build & Package**
+   - Ejecutada en `ubuntu-latest`.
+   - Construcción y empaquetado de la aplicación.
+
+2. **Fase 2 — Auditorías**
+   - Ejecutada en `ubuntu-latest`.
+   - Threagile.
+   - Semgrep.
+   - Trivy.
+   - Gitleaks.
+   - Generación de reportes JSON.
+
+3. **Fase 3 — Centralización en DefectDojo**
+   - Ejecutada en `arc-runner-set`.
+   - Descarga de los reportes.
+   - Importación mediante la API de DefectDojo.
+   - Ejecución sobre el Self-Hosted Runner desplegado por ARC.
+
+4. **Fase 4 — Release & Deploy Helm K8s**
+   - Ejecutada en `ubuntu-latest`.
+   - Preparación de la imagen y tareas asociadas al release.
+   - El comando efectivo de despliegue Helm permanece comentado en el workflow actual, por lo que esta fase no se documenta como un despliegue real realizado por GitHub Actions.
+
+### Resultado
+
+El pipeline completo se ejecutó correctamente después de integrar el Self-Hosted Runner.
+
+La ejecución utilizada como evidencia fue:
+
+```text
+Run ID: 42952926365
+```
+
+Las cuatro fases finalizaron con estado `success`.
+
+La Fase 3 fue ejecutada sobre:
+
+```text
+arc-runner-set
+```
+
+demostrando la integración entre **GitHub Actions, ARC, Kubernetes local y DefectDojo**.
+
+El runner fue creado para ejecutar el job y posteriormente eliminado, manteniendo el carácter efímero de la infraestructura.
