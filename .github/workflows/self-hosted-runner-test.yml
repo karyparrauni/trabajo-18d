@@ -25,6 +25,22 @@ jobs:
           uname -a
           cat /etc/os-release | head -5
 
+      - name: Verificar acceso interno a DefectDojo
+        run: |
+          echo "=== DEFECTDOJO ==="
+          python3 - <<'PYTHON'
+          import urllib.request
+
+          url = "http://defectdojo-django.defectdojo.svc.cluster.local"
+
+          try:
+              response = urllib.request.urlopen(url, timeout=10)
+              print(f"DefectDojo accesible: HTTP {response.status}")
+          except Exception as e:
+              print(f"ERROR: no se pudo acceder a DefectDojo: {e}")
+              raise
+          PYTHON
+
       - name: Finalizar prueba
         run: |
           echo "Self-Hosted Runner funcionando correctamente."
