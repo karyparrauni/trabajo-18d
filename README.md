@@ -64,6 +64,60 @@ Integración de **OWASP DefectDojo Community Edition** para consolidar, desdupli
 
 
 ---
+## TP18B — OWASP DefectDojo
+
+### Objetivo
+
+TP18B integra los resultados de seguridad de los trabajos anteriores en **OWASP DefectDojo**, centralizando los hallazgos de:
+
+- OWASP ZAP
+- Threagile
+- Semgrep
+- Trivy
+- Gitleaks
+
+### Integración
+
+La integración se realizó mediante **GitHub Actions** y la **API v2 de DefectDojo**.
+
+El producto configurado fue **Notes App**, con el engagement **CI/CD Automated Security Audits**.
+
+Los reportes utilizados fueron:
+
+- `reports-json/zap-results.json`
+- `reports-json/threagile-results.json`
+- `reports-json/semgrep-results.json`
+- `reports-json/trivy-container-results.json`
+- `reports-json/gitleaks-report.json`
+
+La importación se realizó mediante la API `/api/v2/reimport-scan/`, utilizando `close_old_findings=true`.
+
+La etapa de importación utiliza `if: always()` para permitir la consolidación de resultados aunque alguna herramienta de seguridad encuentre vulnerabilidades.
+
+### DefectDojo local
+
+DefectDojo se ejecutó en Kubernetes, dentro del namespace `defectdojo`.
+
+El acceso local se realizó mediante:
+
+`kubectl port-forward -n defectdojo svc/defectdojo-django 8082:80`
+
+Durante TP18B, GitHub Actions utilizó runners hospedados por GitHub. Para permitir el acceso desde GitHub Actions hacia el DefectDojo local se utilizó temporalmente un túnel HTTPS.
+
+### Secrets
+
+Las credenciales se mantuvieron fuera del repositorio mediante GitHub Secrets, principalmente:
+
+- `DEFECTDOJO_URL`
+- `DEFECTDOJO_API_KEY`
+- `DOCKERHUB_USERNAME`
+- `DOCKERHUB_TOKEN`
+
+### Resultado
+
+TP18B permitió centralizar los resultados de seguridad de los trabajos anteriores en DefectDojo y automatizar su importación mediante GitHub Actions.
+
+Esta implementación sirvió como base para TP18D, donde el acceso a DefectDojo evolucionó hacia comunicación interna de Kubernetes mediante runners **self-hosted efímeros administrados por ARC**.
 
 ## TP18D — GitHub Actions Self-Hosted Runner en Kubernetes local
 
