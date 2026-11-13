@@ -213,7 +213,7 @@ jobs:
           # Threagile Threat Model (TP14)
           # -------------------------------------------------------------
           upload_scan \
-            "Generic CI/CD Audit" \
+            "Threagile risks report" \
             "Threagile - Threat Modeling" \
             "reports-json/threagile-results.json"
 
