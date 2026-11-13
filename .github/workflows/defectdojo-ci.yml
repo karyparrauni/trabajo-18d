@@ -157,7 +157,7 @@ jobs:
           name: security-json-reports
           path: reports-json
 
-      # Importación de Reportes a la API v2 de DefectDojo vía cURL
+      # Importación/Reimportación de Reportes a la API v2 de DefectDojo vía cURL
       # -------------------------------------------------------------
       - name: Reimportar Reportes JSON a DefectDojo API v2
         env:
@@ -166,14 +166,15 @@ jobs:
           PRODUCT_NAME: "Notes App"
           ENGAGEMENT_NAME: "CI/CD Automated Security Audits"
         run: |
-          echo "=== Reimportando auditorías a DefectDojo API v2 ==="
+          echo "=== Reimportando auditorías a DefectDojo API v2 con deduplicación y test_title ==="
 
           upload_scan() {
             local SCAN_TYPE="$1"
-            local FILE_PATH="$2"
+            local TEST_TITLE="$2"
+            local FILE_PATH="$3"
 
             if [ -f "$FILE_PATH" ]; then
-              echo "  [+] Reimportando $SCAN_TYPE ($FILE_PATH)..."
+              echo "  [+] Reimportando $SCAN_TYPE - $TEST_TITLE ($FILE_PATH)..."
 
               RESPONSE_FILE=$(mktemp)
 
@@ -185,7 +186,9 @@ jobs:
                 -F "product_name=$PRODUCT_NAME" \
                 -F "engagement_name=$ENGAGEMENT_NAME" \
                 -F "scan_type=$SCAN_TYPE" \
+                -F "test_title=$TEST_TITLE" \
                 -F "auto_create_context=true" \
+                -F "deduplication_on_engagement=true" \
                 -F "close_old_findings=true" \
                 -F "file=@$FILE_PATH")
 
@@ -210,7 +213,8 @@ jobs:
           # Threagile Threat Model (TP14)
           # -------------------------------------------------------------
           upload_scan \
-            "Threagile risks report" \
+            "Generic CI/CD Audit" \
+            "Threagile - Threat Modeling" \
             "reports-json/threagile-results.json"
 
           # -------------------------------------------------------------
@@ -218,6 +222,7 @@ jobs:
           # -------------------------------------------------------------
           upload_scan \
             "Semgrep JSON Report" \
+            "Semgrep - SAST" \
             "reports-json/semgrep-results.json"
 
           # -------------------------------------------------------------
@@ -225,6 +230,7 @@ jobs:
           # -------------------------------------------------------------
           upload_scan \
             "Trivy Scan" \
+            "Trivy - Imagen Docker" \
             "reports-json/trivy-container-results.json"
 
           # -------------------------------------------------------------
@@ -232,6 +238,7 @@ jobs:
           # -------------------------------------------------------------
           upload_scan \
             "Gitleaks Scan" \
+            "Gitleaks - Secret Scanning" \
             "reports-json/gitleaks-report.json"
 
       # -------------------------------------------------------------
